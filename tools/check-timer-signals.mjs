@@ -10,8 +10,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 // Проверяем каждый вариант интерфейса: ядро общее, а слой показа у них свой.
 const APPS = [
-  ['основной вариант', 'src/app.js'],
-  ['вариант 2 (журнал)', 'v2/app.js'],
+  ['основной (журнал)', 'app.js'],
+  ['вариант 1 (архив)', 'v1/app.js'],
 ];
 
 const FRAME = 1000 / 30; // кадр «60 Гц»: ровный ритм и «залипание» проверяются одним и тем же шагом

@@ -1,14 +1,13 @@
-// Минимальный service worker: сеть приоритетнее, кэш — подстраховка для офлайна (зал без связи).
-// Данные приложения лежат в localStorage, поэтому офлайн-режим полностью рабочий.
-const CACHE = 'workout-v1';
+// Офлайн-режим варианта 2: сеть приоритетнее, кэш — подстраховка для зала без связи.
+const CACHE = 'workout-v2';
 
 const ASSETS = [
   './',
   './index.html',
   './styles.css',
-  './src/app.js',
-  './src/logic.js',
+  './app.js',
   './manifest.webmanifest',
+  './src/logic.js',
   './favicon.svg',
   './icon-192.png',
   './icon-512.png',
@@ -38,12 +37,11 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
 
   const url = new URL(request.url);
-  if (url.origin !== self.location.origin) return; // чужие запросы не трогаем
+  if (url.origin !== self.location.origin) return;
 
   event.respondWith(
     fetch(request)
       .then((response) => {
-        // свежий ответ обновляет кэш: правки в файлах видны сразу при наличии сети
         const copy = response.clone();
         caches
           .open(CACHE)

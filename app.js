@@ -13,12 +13,17 @@ import {
   estimateWorkoutKcal,
   KCAL_DISCLAIMER,
   createTimer,
-} from '../src/logic.js';
+} from './src/logic.js';
 
 const STORAGE_KEY = 'workout.v1';
 const LEAD_IN = 3; // предупреждающих сигналов перед подходом
 const SECTION_TITLES = { warmup: 'Разминка', main: 'Основная часть', abs: 'Пресс' };
 const SECTIONS = Object.keys(SECTION_TITLES);
+
+// Тема: тёмная по умолчанию (как в макете), плюс светлая «бумажная» и авто по системе.
+const THEMES = ['dark', 'light', 'auto'];
+const THEME_LABELS = { dark: '☾ тёмная', light: '☀ светлая', auto: '◐ авто' };
+const THEME_COLORS = { dark: '#061f1a', light: '#f2f6f3' };
 
 // ponytail: верхняя граница dt на один кадр (см. первый вариант): большой dt возможен только
 // при возврате вкладки из фона, 90 с хватает на обычный троттлинг без телепорта через подход.
@@ -28,6 +33,9 @@ const $ = (id) => document.getElementById(id);
 const ui = {
   weight: $('weightInput'),
   sound: $('soundToggle'),
+  theme: $('themeToggle'),
+  themeColor: $('themeColor'),
+  statusBar: $('statusBarStyle'),
   progress: $('progressText'),
   progressBar: $('progressBar'),
   wake: $('wakeStatus'),
@@ -70,8 +78,9 @@ const ui = {
 
 const cloneWorkout = (list) => list.map((item) => ({ ...item }));
 
-let state = { exercises: cloneWorkout(DEFAULT_WORKOUT), weightKg: null, soundOn: true };
+let state = { exercises: cloneWorkout(DEFAULT_WORKOUT), weightKg: null, soundOn: true, theme: 'dark' };
 let editingId = null;
+let theme = 'dark'; // активная настройка темы: dark | light | auto
 let openMenuId = null; // id строки, у которой раскрыто меню «⋯»
 let showDone = false; // «Показать выполненные»: скрытые строки можно вернуть и снять отметку
 
@@ -103,6 +112,7 @@ function load() {
   const weight = Number(data.weightKg);
   state.weightKg = Number.isFinite(weight) && weight > 0 ? weight : null;
   state.soundOn = data.soundOn !== false;
+  state.theme = THEMES.includes(data.theme) ? data.theme : 'dark';
 }
 
 function isValidExercise(item) {
@@ -682,6 +692,42 @@ ui.sound.addEventListener('click', () => {
   setStatus(state.soundOn ? 'Звук включён.' : 'Звук выключен — сигналы показываются на экране.');
 });
 
+// ---------- Тема ----------
+// Палитра — переменные CSS: переключение сводится к атрибуту data-theme на <html>.
+
+function resolveTheme(preference) {
+  if (preference !== 'auto') return preference;
+  const dark = typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches;
+  return dark ? 'dark' : 'light';
+}
+
+function applyTheme(preference) {
+  theme = THEMES.includes(preference) ? preference : 'dark';
+  state.theme = theme;
+  const resolved = resolveTheme(theme);
+  const root = document.documentElement;
+  if (root) root.dataset.theme = resolved;
+  ui.themeColor?.setAttribute('content', THEME_COLORS[resolved]);
+  // iOS: в тёмной теме полоса статуса прозрачная поверх фона, в светлой — с тёмным текстом
+  ui.statusBar?.setAttribute('content', resolved === 'dark' ? 'black-translucent' : 'default');
+  ui.theme.textContent = `тема: ${THEME_LABELS[theme]}`;
+  ui.theme.setAttribute('aria-label', `Тема оформления: ${THEME_LABELS[theme]}. Нажмите, чтобы переключить.`);
+}
+
+ui.theme.addEventListener('click', () => {
+  const next = THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length];
+  applyTheme(next);
+  save();
+  setStatus(`Тема оформления: ${THEME_LABELS[next]}.`);
+});
+
+// Система сменила схему, а выбрано «авто» — перекрашиваемся сразу
+if (typeof matchMedia === 'function') {
+  matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => {
+    if (theme === 'auto') applyTheme('auto');
+  });
+}
+
 // ---------- Визуальные сигналы ----------
 
 function replay(node, className) {
@@ -946,6 +992,7 @@ function init() {
   load();
   ui.weight.value = state.weightKg === null ? '' : String(state.weightKg);
   updateSoundButton();
+  applyTheme(state.theme);
   syncFormFields();
   syncScrollOffset();
   if (typeof window !== 'undefined') window.addEventListener?.('resize', syncScrollOffset);

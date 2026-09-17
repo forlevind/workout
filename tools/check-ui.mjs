@@ -9,8 +9,8 @@ const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
 // Варианты интерфейса: у каждого своя разметка и свой UI-слой, ядро общее.
 const VARIANTS = [
-  { title: 'основной вариант', html: 'index.html', app: 'src/app.js' },
-  { title: 'вариант 2 (журнал)', html: 'v2/index.html', app: 'v2/app.js' },
+  { title: 'основной (журнал)', html: 'index.html', app: 'app.js' },
+  { title: 'вариант 1 (архив)', html: 'v1/index.html', app: 'v1/app.js' },
 ];
 
 const logic = readFileSync(path.join(root, 'src', 'logic.js'), 'utf8');

@@ -12,7 +12,7 @@ import {
   estimateWorkoutKcal,
   KCAL_DISCLAIMER,
   createTimer,
-} from './logic.js';
+} from '../src/logic.js';
 
 const STORAGE_KEY = 'workout.v1';
 const LEAD_IN = 3; // предупреждающих сигналов перед подходом (ТЗ: не меньше 3)
