@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#061f1a">
+  <!-- запуск с домашнего экрана: без адресной строки, статус-бар поверх тёмного фона -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Тренировка">
+  <meta name="description" content="Моя тренировка: журнал упражнений, прогресс, таймер подходов. Данные хранятся только на устройстве.">
+  <title>Моя тренировка</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="../apple-touch-icon.png">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#workoutList">Перейти к списку упражнений</a>
+  <div class="glow" aria-hidden="true"></div>
+
+  <header class="top">
+    <div class="shell top__inner">
+      <div>
+        <p class="label">Локальный журнал</p>
+        <h1 class="top__h1">Моя тренировка</h1>
+      </div>
+      <button id="resetProgressBtn" class="circle-btn" type="button"
+              aria-label="Сбросить отметки о выполнении">↻</button>
+    </div>
+
+    <div class="shell chips">
+      <label class="chip chip--field" for="weightInput">
+        <span class="chip__label">вес</span>
+        <input id="weightInput" class="chip__input" type="number" inputmode="decimal"
+               min="1" max="400" step="0.5" placeholder="—">
+        <span class="chip__unit">кг</span>
+      </label>
+      <button id="soundToggle" class="chip chip--btn" type="button" aria-pressed="true">звук: вкл</button>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section class="card" aria-labelledby="progressLabel">
+      <div class="card__row">
+        <p id="progressLabel" class="label">Прогресс сегодня</p>
+        <p class="count" id="progressText">0 из 0 выполнено</p>
+      </div>
+      <progress id="progressBar" class="bar" max="100" value="0">0%</progress>
+      <div class="card__row card__row--footer">
+        <button id="finishWorkoutBtn" class="outline-btn" type="button">Завершить тренировку</button>
+        <p class="note" id="wakeStatus"></p>
+      </div>
+      <p class="note" id="kcalDisclaimer"></p>
+    </section>
+
+    <section class="card" aria-labelledby="currentLabel">
+      <p id="currentLabel" class="label">Сейчас по плану</p>
+      <p class="current__name" id="currentExercise">Список пуст</p>
+      <p class="current__params" id="currentParams"></p>
+      <p class="note" id="workoutKcal"></p>
+    </section>
+
+    <div class="section-head">
+      <div>
+        <p class="label">По порядку</p>
+        <h2 class="section-head__title" id="listTitle">Комплекс</h2>
+      </div>
+      <button id="addBtn" class="outline-btn" type="button">+ Упражнение</button>
+    </div>
+
+    <div id="workoutList" class="list"></div>
+
+    <p id="status" class="status" role="status" aria-live="polite"></p>
+  </main>
+
+  <!-- Нижний лист: форма добавления/правки и служебные действия -->
+  <section id="sheet" class="sheet" aria-labelledby="formTitle" aria-hidden="true">
+    <div class="sheet__panel">
+      <div class="sheet__head">
+        <h2 id="formTitle" class="sheet__title">Добавить упражнение</h2>
+        <button id="sheetCloseBtn" class="circle-btn circle-btn--sm" type="button" aria-label="Закрыть">✕</button>
+      </div>
+
+      <form id="exerciseForm" class="form" novalidate>
+        <label class="field" for="nameInput">
+          <span class="field__label">Название</span>
+          <input id="nameInput" class="field__input" type="text" maxlength="120"
+                 placeholder="Например: Приседания" autocomplete="off">
+        </label>
+
+        <label class="field" for="typeSelect">
+          <span class="field__label">Тип</span>
+          <select id="typeSelect" class="field__input">
+            <option value="reps">Повторения</option>
+            <option value="time">На время</option>
+          </select>
+        </label>
+
+        <label class="field" for="repsInput">
+          <span id="repsLabelText" class="field__label">Повторений</span>
+          <input id="repsInput" class="field__input" type="number" min="1" max="999" step="1" value="10">
+        </label>
+
+        <label id="secondsField" class="field" for="secondsInput" hidden>
+          <span class="field__label">Секунд в подходе</span>
+          <input id="secondsInput" class="field__input" type="number" min="1" max="3600" step="1" value="30">
+        </label>
+
+        <label class="field" for="sectionSelect">
+          <span class="field__label">Секция</span>
+          <select id="sectionSelect" class="field__input">
+            <option value="warmup">Разминка</option>
+            <option value="main" selected>Основная часть</option>
+            <option value="abs">Пресс</option>
+          </select>
+        </label>
+
+        <p id="formError" class="form__error" role="alert" hidden></p>
+
+        <div class="form__actions">
+          <button id="submitBtn" class="btn-primary" type="submit">Добавить</button>
+          <button id="cancelEditBtn" class="outline-btn" type="button" hidden>Отмена</button>
+        </div>
+      </form>
+
+      <div class="sheet__foot">
+        <button id="resetWorkoutBtn" class="outline-btn" type="button">Вернуть стартовый комплекс</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="timer" class="timer" hidden aria-labelledby="timerTitle">
+    <div class="shell timer__inner">
+      <div class="timer__head">
+        <h2 id="timerTitle" class="timer__title">Таймер</h2>
+        <p id="timerPhase" class="timer__phase"></p>
+      </div>
+
+      <div class="timer__main">
+        <p id="timerBig" class="timer__big">3</p>
+        <div class="timer__meta">
+          <p id="timerSetInfo" class="timer__sets"></p>
+          <!-- визуальный эквивалент тика: мигает раз в секунду, работает и при выключенном звуке -->
+          <p class="timer__rhythm">Секунда <span id="tickDot" class="timer__dot" aria-hidden="true"></span></p>
+        </div>
+      </div>
+
+      <div class="timer__controls">
+        <button id="timerPauseBtn" class="outline-btn" type="button">Пауза</button>
+        <!-- единственная крупная кнопка панели: главное действие момента -->
+        <button id="timerNextBtn" class="btn-primary" type="button" hidden>Следующий подход</button>
+        <button id="timerDoneBtn" class="btn-primary" type="button" hidden>Готово ✓</button>
+        <button id="timerStopBtn" class="outline-btn" type="button">Стоп / Сброс</button>
+      </div>
+    </div>
+  </section>
+
+  <p id="banner" class="banner" role="status" aria-live="assertive"></p>
+
+  <script type="module" src="./app.js"></script>
+  <script>
+    // Офлайн-режим: приложение открывается в зале без сети. Регистрация некритична.
+    if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+      addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>

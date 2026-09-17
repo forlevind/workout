@@ -8,7 +8,11 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const APP = pathToFileURL(path.join(root, 'src', 'app.js')).href;
+// Проверяем каждый вариант интерфейса: ядро общее, а слой показа у них свой.
+const APPS = [
+  ['основной вариант', 'src/app.js'],
+  ['вариант 2 (журнал)', 'v2/app.js'],
+];
 
 const FRAME = 1000 / 30; // кадр «60 Гц»: ровный ритм и «залипание» проверяются одним и тем же шагом
 const LEAD_IN = 3; // столько же, сколько LEAD_IN в src/app.js
@@ -153,13 +157,18 @@ function makeHarness() {
 }
 
 // Каждый прогон — отдельный экземпляр модуля: у app.js есть состояние (state, timer, audioCtx).
-let boots = 0;
-async function boot() {
-  const harness = makeHarness();
-  boots += 1;
-  await import(`${APP}?case=${boots}`);
-  return harness;
+// boot() пересоздаётся на каждый вариант, поэтому счётчик кэша импорта у них независимый.
+function makeBoot(APP) {
+  let boots = 0;
+  return async function boot() {
+    const harness = makeHarness();
+    boots += 1;
+    await import(`${APP}?case=${boots}`);
+    return harness;
+  };
 }
+
+let boot = null; // назначается перед прогоном каждого варианта
 
 const el = (harness, id) => harness.byId.get(id);
 
@@ -282,15 +291,25 @@ scenario('один кадр dt = 4 с (остановка главного по�
 // ---------- Прогон ----------
 
 let failed = 0;
-for (const [name, body] of cases) {
-  try {
-    const note = await body();
-    console.log(`OK   ${name}${note ? `\n     ${note}` : ''}`);
-  } catch (error) {
-    failed += 1;
-    console.log(`FAIL ${name}\n     ${error.message.split('\n').join('\n     ')}`);
+let total = 0;
+for (const [appTitle, appFile] of APPS) {
+  boot = makeBoot(pathToFileURL(path.join(root, appFile)).href);
+  console.log(`\n=== ${appTitle} (${appFile}) ===`);
+  for (const [name, body] of cases) {
+    total += 1;
+    try {
+      const note = await body();
+      console.log(`OK   ${name}${note ? `\n     ${note}` : ''}`);
+    } catch (error) {
+      failed += 1;
+      console.log(`FAIL ${name}\n     ${error.message.split('\n').join('\n     ')}`);
+    }
   }
 }
 
-console.log(failed ? `ВЕРДИКТ: провалов ${failed} из ${cases.length}` : `ВЕРДИКТ: все ${cases.length} проверки пройдены`);
+console.log(
+  failed
+    ? `ВЕРДИКТ: провалов ${failed} из ${total} (вариантов: ${APPS.length})`
+    : `ВЕРДИКТ: все ${total} проверки пройдены в ${APPS.length} вариантах`,
+);
 process.exit(failed ? 1 : 0);
