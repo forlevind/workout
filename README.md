@@ -27,6 +27,14 @@ node server.js
 
 Проверить с телефона в домашней сети: `node server.js`, затем открыть `http://<IP компьютера>:5173`.
 Установка на домашний экран и офлайн работают только по `http(s)`; с `file://` их не будет.
+Важно: по локальному `http://` на iPhone service worker не регистрируется (не secure context),
+поэтому офлайн-режим появляется только на HTTPS-хостинге.
+
+### Живая версия
+
+<https://forlevind.github.io/workout/> — GitHub Pages из ветки `main` (репозиторий `forlevind/workout`).
+Обновление: поправить файлы → `git add -A && git commit -m "…" && git push` → Pages пересобирается
+за минуту. Локальные `backup/` и `preview/` в репозиторий не попадают (`.gitignore`).
 
 ## Оформление
 
