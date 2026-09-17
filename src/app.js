@@ -77,6 +77,7 @@ const cloneWorkout = (list) => list.map((item) => ({ ...item }));
 
 let state = { exercises: cloneWorkout(DEFAULT_WORKOUT), weightKg: null, soundOn: true, theme: 'light' };
 let editingId = null;
+let showDone = false; // «Показать выполненные»: скрытые строки можно вернуть и снять отметку
 let theme = 'light'; // активная настройка темы: light | dark | auto
 
 // ---------- Сохранение / восстановление (localStorage — единственный источник данных) ----------
@@ -165,7 +166,9 @@ function paramsText(item) {
 
 function render() {
   ui.list.textContent = '';
-  const nextId = state.exercises.find((item) => !item.done)?.id ?? null;
+  const pending = state.exercises.filter((item) => !item.done);
+  const nextId = pending[0]?.id ?? null;
+  const doneItems = [];
   let currentSection = null;
 
   state.exercises.forEach((item, index) => {
@@ -173,10 +176,59 @@ function render() {
       currentSection = item.section;
       ui.list.append(renderSectionTitle(item.section, index));
     }
+    if (item.done) {
+      doneItems.push({ item, index });
+      return; // выполненные с экрана убираем: список показывает только то, что осталось сделать
+    }
     ui.list.append(renderExercise(item, index, item.id === nextId));
   });
 
+  if (!pending.length && state.exercises.length) ui.list.append(renderAllDone());
+  // отметку можно снять: выполненные прячутся, но по кнопке возвращаются на экран
+  if (doneItems.length) ui.list.append(renderDoneToggle(doneItems.length));
+  if (showDone) doneItems.forEach(({ item, index }) => ui.list.append(renderExercise(item, index, false)));
+
   renderSummary();
+  return nextId; // нужен, чтобы подтянуть следующее упражнение к верху страницы
+}
+
+// Когда всё выполнено, список пуст — объясняем это и подсказываем, где сбросить отметки
+function renderAllDone() {
+  const box = document.createElement('p');
+  box.className = 'empty-state';
+  box.textContent = 'Все упражнения выполнены. «↺ Сбросить отметки» — под списком.';
+  return box;
+}
+
+// Скрытые выполненные: по умолчанию их нет на экране, но вернуть и снять отметку можно
+function renderDoneToggle(count) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'show-done';
+  button.dataset.action = 'show-done';
+  button.setAttribute('aria-expanded', String(showDone));
+  button.textContent = showDone ? `Скрыть выполненные · ${count}` : `Показать выполненные · ${count}`;
+  return button;
+}
+
+// Следующее упражнение встаёт на место законченного и подтягивается к верху экрана
+function scrollToNext(id) {
+  if (!id) return;
+  syncScrollOffset();
+  const row = document.getElementById(`row-${id}`);
+  row?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
+}
+
+// Отступ прокрутки: на широком экране шапка липкая и не должна накрывать подтянутую карточку.
+// Считаем высоту по факту, а не константой — шапка меняет высоту вместе с содержимым.
+function syncScrollOffset() {
+  const root = document.documentElement;
+  if (!root?.style || typeof document.querySelector !== 'function') return;
+  const header = document.querySelector('.topbar');
+  if (!header) return;
+  const sticky = getComputedStyle(header).position === 'sticky';
+  const gap = sticky ? Math.round(header.getBoundingClientRect().height) + 12 : 14;
+  root.style.setProperty('--scroll-offset', `${gap}px`);
 }
 
 // Заголовок секции: название + счётчик выполненных внутри этого блока.
@@ -190,9 +242,11 @@ function renderSectionTitle(section, fromIndex) {
     total += 1;
     if (state.exercises[i].done) done += 1;
   }
+  const complete = total > 0 && done === total;
 
   const heading = document.createElement('h3');
-  heading.className = `section-title section-title--${section}`;
+  heading.className = `section-title section-title--${section}${complete ? ' is-complete' : ''}`;
+  if (complete) heading.setAttribute('aria-label', `${SECTION_TITLES[section]}: выполнено ${done} из ${total}`);
 
   const label = document.createElement('span');
   label.className = 'section-title__label';
@@ -203,11 +257,22 @@ function renderSectionTitle(section, fromIndex) {
   count.textContent = `${done} / ${total}`;
 
   heading.append(label, count);
+
+  // закрытая секция помечается галочкой — видно, что блок пройден целиком
+  if (complete) {
+    const tick = document.createElement('span');
+    tick.className = 'section-title__tick';
+    tick.textContent = '✓';
+    tick.setAttribute('aria-hidden', 'true');
+    heading.append(tick);
+  }
+
   return heading;
 }
 
 function renderExercise(item, index, isNext) {
   const card = document.createElement('article');
+  card.id = `row-${item.id}`; // якорь для «подтянуть следующее наверх»
   card.className = `exercise exercise--${item.section}${item.done ? ' is-done' : ''}${isNext ? ' is-next' : ''}`;
 
   const num = document.createElement('span');
@@ -353,12 +418,19 @@ function setStatus(text) {
 ui.list.addEventListener('click', (event) => {
   const button = event.target.closest('button[data-action]');
   if (!button) return;
+  if (button.dataset.action === 'show-done') {
+    showDone = !showDone;
+    render();
+    return;
+  }
   const { action, id } = button.dataset;
   const item = state.exercises.find((entry) => entry.id === id);
   if (!item) return;
+  let pullToNext = false; // отметили выполненным → следующее упражнение поднимаем наверх
 
   switch (action) {
     case 'toggle':
+      pullToNext = !item.done;
       state.exercises = toggleDone(state.exercises, id);
       setStatus(item.done ? `Снята отметка: ${item.name}` : `Отмечено выполненным: ${item.name}`);
       break;
@@ -384,7 +456,8 @@ ui.list.addEventListener('click', (event) => {
       return;
   }
   save();
-  render();
+  const nextId = render();
+  if (pullToNext) scrollToNext(nextId);
 });
 
 // ---------- Форма CRUD ----------
@@ -890,7 +963,8 @@ ui.timerDone.addEventListener('click', () => {
   if (item && !item.done) state.exercises = toggleDone(state.exercises, id);
   stopTimer();
   save();
-  render();
+  const nextId = render();
+  if (item) scrollToNext(nextId);
   setStatus(item ? `Отмечено выполненным: ${item.name}` : 'Готово.');
 });
 
@@ -902,6 +976,8 @@ function init() {
   updateSoundButton();
   applyTheme(state.theme);
   syncFormFields();
+  syncScrollOffset();
+  if (typeof window !== 'undefined') window.addEventListener?.('resize', syncScrollOffset);
   render();
 }
 

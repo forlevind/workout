@@ -277,6 +277,50 @@ main.shell { padding-top: 16px; display: grid; gap: 14px; }
 }
 .subhead:first-child { margin-top: 4px; }
 .subhead__count { font-size: .74rem; color: var(--text-3); letter-spacing: .06em; }
+
+/* закрытая секция: галочка рядом с подзаголовком и приглушённая подпись */
+.subhead__tick {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--lime-soft);
+  border: 1px solid rgba(198, 255, 74, .4);
+  color: var(--lime);
+  font-size: .78rem;
+  font-weight: 700;
+}
+.subhead.is-complete .label { color: var(--text-2); }
+
+/* Список пуст, когда всё выполнено: объясняем это, а не оставляем пустоту */
+.empty-state {
+  margin: 4px 0 0;
+  padding: 18px;
+  border: 1px dashed var(--outline-2);
+  border-radius: var(--r-row);
+  background: var(--row);
+  color: var(--text-2);
+  font-size: .92rem;
+}
+
+/* Скрытые выполненные: кнопка возвращает их на экран, чтобы можно было снять отметку */
+.show-done {
+  align-self: stretch;
+  margin: 2px 0 0;
+  min-height: 46px;
+  padding: 12px 16px;
+  font: inherit;
+  font-size: .84rem;
+  color: var(--text-2);
+  background: transparent;
+  border: 1px dashed var(--outline-2);
+  border-radius: var(--r-btn);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: color .2s, background .2s, border-color .2s;
+}
+.show-done:hover { color: var(--text); background: var(--card-2); border-color: var(--outline); }
 .subhead::after {
   content: "";
   flex: 1;
@@ -299,6 +343,8 @@ main.shell { padding-top: 16px; display: grid; gap: 14px; }
   border: 1px solid var(--row-line);
   border-radius: var(--r-row);
   background: var(--row);
+  /* якорь «подтянуть следующее наверх»: отступ считает app.js по высоте шапки */
+  scroll-margin-top: var(--scroll-offset, 14px);
   transition: border-color .25s, background .25s, transform .25s var(--ease);
 }
 .row:hover { background: var(--card-2); }

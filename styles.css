@@ -588,6 +588,50 @@ select.field__input {
   letter-spacing: .06em;
 }
 
+/* закрытая секция: галочка рядом с подзаголовком и приглушённая подпись */
+.section-title__tick {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--ok-soft);
+  border: 1px solid var(--ok-line);
+  color: var(--ok-text);
+  font-size: .78rem;
+  font-weight: 700;
+}
+.section-title.is-complete .section-title__label { color: var(--ok-text); }
+
+/* Список пуст, когда всё выполнено: объясняем это, а не оставляем пустоту */
+.empty-state {
+  margin: 4px 0 0;
+  padding: 16px 18px;
+  border: 1px dashed var(--line-2);
+  border-radius: var(--r);
+  background: var(--tint-1);
+  color: var(--text-dim);
+  font-size: .92rem;
+}
+
+/* Скрытые выполненные: кнопка возвращает их на экран, чтобы можно было снять отметку */
+.show-done {
+  align-self: stretch;
+  margin: 2px 0 0;
+  padding: 11px 16px;
+  font: inherit;
+  font-size: .84rem;
+  font-weight: 500;
+  color: var(--muted);
+  background: transparent;
+  border: 1px dashed var(--line-2);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: color .2s, background .2s, border-color .2s;
+}
+.show-done:hover { color: var(--text); background: var(--tint-1); border-color: var(--line-2); }
+
 /* линия-«хвост» дотягивает заголовок до правого края */
 .section-title::after {
   content: "";
@@ -612,6 +656,8 @@ select.field__input {
   background: linear-gradient(150deg, var(--card-from), var(--card-to));
   box-shadow: var(--shadow-card);
   overflow: hidden;
+  /* якорь «подтянуть следующее наверх»: отступ считает app.js по высоте липкой шапки */
+  scroll-margin-top: var(--scroll-offset, 14px);
   transition: transform .25s var(--ease), border-color .25s, box-shadow .25s, background .25s;
 }
 .exercise::before {

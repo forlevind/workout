@@ -73,6 +73,7 @@ const cloneWorkout = (list) => list.map((item) => ({ ...item }));
 let state = { exercises: cloneWorkout(DEFAULT_WORKOUT), weightKg: null, soundOn: true };
 let editingId = null;
 let openMenuId = null; // id строки, у которой раскрыто меню «⋯»
+let showDone = false; // «Показать выполненные»: скрытые строки можно вернуть и снять отметку
 
 // ---------- Сохранение / восстановление ----------
 
@@ -156,8 +157,10 @@ function durationText(totalSeconds) {
 function paramsText(item) {
   if (item.type === 'time') {
     const perSet = durationText(item.seconds);
-    const total = durationText(item.reps * item.seconds);
-    return item.reps > 1 ? `${perSet} × ${item.reps} · всего ${total}` : perSet;
+    const total = item.reps * item.seconds;
+    const sets = item.reps > 1 ? `${perSet} × ${item.reps}` : perSet;
+    // суммарное время показываем, только когда оно добавляет информацию и не ломает строку
+    return total >= 60 && item.reps > 1 ? `${sets} · всего ${durationText(total)}` : sets;
   }
   const base = `${item.reps} ${plural(item.reps, 'повторение', 'повторения', 'повторений')}`;
   return item.note ? `${base} · ${item.note}` : base;
@@ -167,7 +170,9 @@ function paramsText(item) {
 
 function render() {
   ui.list.textContent = '';
-  const nextId = state.exercises.find((item) => !item.done)?.id ?? null;
+  const pending = state.exercises.filter((item) => !item.done);
+  const nextId = pending[0]?.id ?? null;
+  const doneItems = [];
   let currentSection = null;
 
   state.exercises.forEach((item, index) => {
@@ -175,11 +180,59 @@ function render() {
       currentSection = item.section;
       ui.list.append(renderSectionLabel(item.section, index));
     }
+    if (item.done) {
+      doneItems.push({ item, index });
+      return; // выполненные с экрана убираем: список показывает только то, что осталось сделать
+    }
     ui.list.append(renderRow(item, index, item.id === nextId));
   });
 
+  if (!pending.length && state.exercises.length) ui.list.append(renderAllDone());
+  // отметку можно снять: выполненные прячутся, но по кнопке возвращаются на экран
+  if (doneItems.length) ui.list.append(renderDoneToggle(doneItems.length));
+  if (showDone) doneItems.forEach(({ item, index }) => ui.list.append(renderRow(item, index, false)));
+
   renderSummary();
   renderCurrent();
+  return nextId; // нужен, чтобы подтянуть следующее упражнение к верху страницы
+}
+
+// Когда всё выполнено, список пуст — объясняем это и подсказываем, где сбросить отметки
+function renderAllDone() {
+  const box = document.createElement('p');
+  box.className = 'empty-state';
+  box.textContent = 'Все упражнения выполнены. Сбросить отметки — кнопка ↻ в шапке.';
+  return box;
+}
+
+// Скрытые выполненные: по умолчанию их нет на экране, но вернуть и снять отметку можно
+function renderDoneToggle(count) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'show-done';
+  button.dataset.action = 'show-done';
+  button.setAttribute('aria-expanded', String(showDone));
+  button.textContent = showDone ? `Скрыть выполненные · ${count}` : `Показать выполненные · ${count}`;
+  return button;
+}
+
+// Следующее упражнение встаёт на место законченного и подтягивается к верху экрана
+function scrollToNext(id) {
+  if (!id) return;
+  syncScrollOffset();
+  const row = document.getElementById(`row-${id}`);
+  row?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
+}
+
+// Отступ прокрутки: если шапка когда-нибудь станет липкой, строку не накроет — высота считается по факту
+function syncScrollOffset() {
+  const root = document.documentElement;
+  if (!root?.style || typeof document.querySelector !== 'function') return;
+  const header = document.querySelector('.top');
+  if (!header) return;
+  const sticky = getComputedStyle(header).position === 'sticky';
+  const gap = sticky ? Math.round(header.getBoundingClientRect().height) + 12 : 14;
+  root.style.setProperty('--scroll-offset', `${gap}px`);
 }
 
 function renderSectionLabel(section, fromIndex) {
@@ -190,9 +243,11 @@ function renderSectionLabel(section, fromIndex) {
     total += 1;
     if (state.exercises[i].done) done += 1;
   }
+  const complete = total > 0 && done === total;
 
   const row = document.createElement('div');
-  row.className = 'subhead';
+  row.className = `subhead${complete ? ' is-complete' : ''}`;
+  if (complete) row.setAttribute('aria-label', `${SECTION_TITLES[section]}: выполнено ${done} из ${total}`);
 
   const label = document.createElement('span');
   label.className = 'label';
@@ -203,11 +258,22 @@ function renderSectionLabel(section, fromIndex) {
   count.textContent = `${done} / ${total}`;
 
   row.append(label, count);
+
+  // закрытая секция помечается галочкой — видно, что блок пройден целиком
+  if (complete) {
+    const tick = document.createElement('span');
+    tick.className = 'subhead__tick';
+    tick.textContent = '✓';
+    tick.setAttribute('aria-hidden', 'true');
+    row.append(tick);
+  }
+
   return row;
 }
 
 function renderRow(item, index, isNext) {
   const row = document.createElement('article');
+  row.id = `row-${item.id}`; // якорь для «подтянуть следующее наверх»
   const menuOpen = openMenuId === item.id;
   row.className = `row${item.done ? ' is-done' : ''}${isNext ? ' is-next' : ''}`;
 
@@ -322,12 +388,20 @@ function setStatus(text) {
 ui.list.addEventListener('click', (event) => {
   const button = event.target.closest('button[data-action]');
   if (!button) return;
+  if (button.dataset.action === 'show-done') {
+    showDone = !showDone;
+    render();
+    return;
+  }
   const { action, id } = button.dataset;
   const item = state.exercises.find((entry) => entry.id === id);
   if (!item) return;
+  let pullToNext = false; // отметили выполненным → следующее упражнение поднимаем наверх
+  openMenuId = null;
 
   switch (action) {
     case 'toggle':
+      pullToNext = !item.done;
       state.exercises = toggleDone(state.exercises, id);
       openMenuId = null;
       setStatus(item.done ? `Снята отметка: ${item.name}` : `Отмечено выполненным: ${item.name}`);
@@ -340,7 +414,6 @@ ui.list.addEventListener('click', (event) => {
     case 'down':
       stopTimerForExercise(id);
       state.exercises = moveExercise(state.exercises, id, action === 'up' ? -1 : 1);
-      openMenuId = null;
       break;
     case 'edit':
       startEdit(item);
@@ -351,7 +424,6 @@ ui.list.addEventListener('click', (event) => {
       stopTimerForExercise(id);
       state.exercises = removeExercise(state.exercises, id);
       if (editingId === id) resetForm();
-      openMenuId = null;
       setStatus(`Удалено: ${item.name}`);
       break;
     case 'start':
@@ -361,7 +433,8 @@ ui.list.addEventListener('click', (event) => {
       return;
   }
   save();
-  render();
+  const nextId = render();
+  if (pullToNext) scrollToNext(nextId);
 });
 
 // Клик мимо меню «⋯» закрывает его
@@ -862,7 +935,8 @@ ui.timerDone.addEventListener('click', () => {
   if (item && !item.done) state.exercises = toggleDone(state.exercises, id);
   stopTimer();
   save();
-  render();
+  const nextId = render();
+  if (item) scrollToNext(nextId);
   setStatus(item ? `Отмечено выполненным: ${item.name}` : 'Готово.');
 });
 
@@ -873,6 +947,8 @@ function init() {
   ui.weight.value = state.weightKg === null ? '' : String(state.weightKg);
   updateSoundButton();
   syncFormFields();
+  syncScrollOffset();
+  if (typeof window !== 'undefined') window.addEventListener?.('resize', syncScrollOffset);
   render();
 }
 
